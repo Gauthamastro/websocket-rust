@@ -1,6 +1,6 @@
 
 use std::env;
-
+use std::time::SystemTime;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 use websocket_lite::{Message, Opcode, Result};
@@ -13,6 +13,9 @@ async fn run() -> Result<()> {
      ws_stream.send(Message::text(str)).await;
     // ws_stream.send(Message::text(String::from("singh"))).await;
 
+    let mut start_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_micros();
+    let mut trade_counter: u32 = 0;
+    let mut tps_sum:f64 = 0.0;
     loop {
         let msg: Option<Result<Message>> = ws_stream.next().await;
 
@@ -31,9 +34,13 @@ async fn run() -> Result<()> {
 
         match msg.opcode() {
             Opcode::Text => {
-                println!("{}", msg.as_text().unwrap());
-
-                //ws_stream.send(msg).await?
+                // println!("{}", msg.as_text().unwrap());
+                let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_micros();
+                let instantaneous_tps = 1.0/(f64::from((current_time - start_time) as i32)/1000000.0);
+                trade_counter = trade_counter +1;
+                tps_sum = tps_sum + instantaneous_tps;
+                println!("Instant Diff: {}, Average Diff: {}",instantaneous_tps, tps_sum/(trade_counter as f64));
+                start_time = current_time;
             }
             Opcode::Binary =>  {},  // ws_stream.send(msg).await?,
             Opcode::Ping => ws_stream.send(Message::pong(msg.into_data())).await?,
